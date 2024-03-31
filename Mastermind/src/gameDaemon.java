@@ -19,10 +19,9 @@ public class gameDaemon {
             }
 
         }
-        catch (IOException e){
-            System.out.println("IOException on socket listen: " + e);
+        catch (IOException e) {
+            System.out.println("IOException occurred: " + e.getMessage());
             e.printStackTrace();
-
         }
 
     }
