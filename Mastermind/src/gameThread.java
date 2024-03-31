@@ -1,81 +1,87 @@
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.Socket;
 import java.util.Random;
 
-public class gameThread extends Thread{
-    private Socket client;
-    gameThread(Socket c){
-        this.client=c;
+public class gameThread extends Thread {
+    private final Socket client;
+
+    public gameThread(Socket clientSocket) {
+        this.client = clientSocket;
     }
 
-    public String processGuess(String guess, StringBuilder correct){
-        String P ="";
-        String C = "";
-        for (int i = 0; i < correct.length(); i++) {
+    // Method to process the user's guess and generate the response
+    private static String processGuess(String guess, String code) {
+        StringBuilder response = new StringBuilder();
+        StringBuilder remainingGuess = new StringBuilder(guess);
+        StringBuilder remainingCode = new StringBuilder(code);
 
-            for (int j = 0; j < guess.length(); j++) {
-                if (guess.charAt(j)==correct.charAt(i)){
-                    if (j==i){
-                        P.concat("P");
-                    }else {
-                        C.concat("C");
+        // First pass: Check for correct color and position
+        for (int i = 0; i < 4; i++) {
+            char guessedChar = guess.charAt(i);
+            char codeChar = code.charAt(i);
+
+            if (guessedChar == codeChar) {
+                response.append('P');  // Correct color and position
+                remainingGuess.setCharAt(i, ' '); // Mark the character in guess as already used
+                remainingCode.setCharAt(i, ' ');
+            }
+        }
+
+        // Second pass: Check for correct color but wrong position
+        if (response.length() < 4) { // Not all positions filled with 'P'
+            for (int i = 0; i < 4; i++) {
+                char codeChar = remainingCode.charAt(i);
+                if (codeChar != ' ') {
+                    int index = remainingGuess.indexOf(String.valueOf(codeChar));
+
+                    if (index != -1) {
+                        response.append('C');  // Correct color but wrong position
+                        remainingGuess.setCharAt(index, ' '); // Mark the character in guess as already used
                     }
                 }
             }
-
         }
-        return C.concat(P);
+
+        return response.reverse().toString(); // Reverse the response for correct output order
     }
 
-    public void run(){
-        try{
-            DataInputStream in= new DataInputStream(client.getInputStream());
-//          DataOutputStream out= new DataOutputStream(client.getOutputStream());
-            PrintStream out =new PrintStream(client.getOutputStream());
+    // Override the run method of Thread class for thread execution
+    @Override
+    public void run() {
+        try (DataInputStream in = new DataInputStream(client.getInputStream());
+             DataOutputStream out = new DataOutputStream(client.getOutputStream())) {
+
+            // Generate a random code for the game
             Random random = new Random();
             StringBuilder codeBuilder = new StringBuilder();
-
-            String letters= "RYGBWO";
+            String letters = "RYGBWO";
             for (int i = 0; i < 4; i++) {
                 codeBuilder.append(letters.charAt(random.nextInt(letters.length())));
             }
-            System.out.println("Game string to win is : "+ codeBuilder);
+            System.out.println("Game string to win is: " + codeBuilder);
 
-
-            String gameString = "    ";
-            int count=0;
-
-
-            while ((gameString.equals("PPPP"))|| (count<=20)) {
-                if (count==0){
-                    out.println("GO");
-                    System.out.println("GO message has been send");
+            int count = 0;
+            while (count <= 20) { // Limit the number of guesses to 20
+                if (count == 0) {
+                    out.writeUTF("GO"); // Send the start message to the client
+                    System.out.println("GO message has been sent");
                 }
                 count++;
-                gameString= in.readUTF();  //read the string from the client
-                if (gameString.toLowerCase().equals("quit")){
-                    break;
-                }
-                gameString= processGuess(gameString, codeBuilder);
 
+                String gameString = in.readUTF(); // Read the user's guess from the client
+                System.out.println("The guess is: " + gameString);
+                if (gameString.equalsIgnoreCase("quit")) {
+                    break; // Exit the loop if the user wants to quit
+                }
+                gameString = processGuess(gameString, codeBuilder.toString()); // Process the guess
+                System.out.println("The gameString is: " + gameString);
+                out.writeUTF(gameString); // Send the response to the client
             }
 
-
-
-            client.close();    // if done close socket
-
-
-        }
-        catch (IOException e){
+            client.close(); // Close the socket when done
+        } catch (IOException e) {
             System.out.println("IOException on socket listen: " + e);
             e.printStackTrace();
-
         }
-
-
     }
-
 }
