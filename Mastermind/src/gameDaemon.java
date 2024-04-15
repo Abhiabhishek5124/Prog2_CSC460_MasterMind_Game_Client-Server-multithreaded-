@@ -8,7 +8,7 @@ public class gameDaemon {
         try{
             // Create a ServerSocket object to listen on the specified port
 
-            ServerSocket server= new ServerSocket(port);
+            ServerSocket server = new ServerSocket(port, 0, InetAddress.getByName("0.0.0.0"));
             Socket socket;
             System.out.println("Waiting for connection");
 
